@@ -3,7 +3,7 @@ Secure receipt management app
 
 SnapNSave is a **serverless web application** built using AWS services for secure, scalable receipt/bill data management. It allows users to upload images of receipts, automatically extracts relevant data using OCR, and stores it securely for later retrieval.
 
-## 🚀 Key Features
+## Key Features
 
 - Serverless architecture using AWS Lambda and API Gateway  
 - OCR-based data extraction with Amazon Textract  
@@ -14,7 +14,7 @@ SnapNSave is a **serverless web application** built using AWS services for secur
 
 ---
 
-## 🧱 Technologies Used
+## Technologies Used
 
 - **AWS Cognito** – Authentication  
 - **Amazon S3** – File Storage  
@@ -25,7 +25,7 @@ SnapNSave is a **serverless web application** built using AWS services for secur
 
 ---
 
-## 🧩 System Flow
+## System Flow
 
 1. User logs in via AWS Cognito (frontend handled separately).  
 2. Authenticated user uploads bill image to Amazon S3.  
@@ -37,7 +37,7 @@ SnapNSave is a **serverless web application** built using AWS services for secur
 
 ---
 
-## 🛠 AWS Resources
+## AWS Resources
 
 | Resource Name              | Purpose                                 |
 |---------------------------|-----------------------------------------|
