@@ -1,0 +1,134 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  Secure Receipt Manager - Serverless backend for receipt upload, OCR with Textract,
+  KMS-encrypted DynamoDB storage, Cognito auth, and SES notifications.
+
+Globals:
+  Function:
+    Timeout: 30
+    MemorySize: 256
+    Runtime: python3.12
+
+Resources:
+  ## -------------------------
+  ## Cognito for Authentication
+  ## -------------------------
+  UserPool:
+    Type: AWS::Cognito::UserPool
+    Properties:
+      UserPoolName: SecureReceiptUserPool
+      AutoVerifiedAttributes:
+        - email
+
+  UserPoolClient:
+    Type: AWS::Cognito::UserPoolClient
+    Properties:
+      ClientName: SecureReceiptClient
+      UserPoolId: !Ref UserPool
+      GenerateSecret: false
+
+  ## -------------------------
+  ## KMS Key for Encryption
+  ## -------------------------
+  AppKMSKey:
+    Type: AWS::KMS::Key
+    Properties:
+      Description: KMS key for DynamoDB and S3 encryption
+      KeyPolicy:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              AWS: !Sub arn:aws:iam::${AWS::AccountId}:root
+            Action: "kms:*"
+            Resource: "*"
+
+  ## -------------------------
+  ## DynamoDB (KMS Encrypted)
+  ## -------------------------
+  ReceiptsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: ReceiptsTable
+      AttributeDefinitions:
+        - AttributeName: ReceiptId
+          AttributeType: S
+      KeySchema:
+        - AttributeName: ReceiptId
+          KeyType: HASH
+      BillingMode: PAY_PER_REQUEST
+      SSESpecification:
+        SSEEnabled: true
+        KMSMasterKeyId: !Ref AppKMSKey
+
+  ## -------------------------
+  ## S3 Bucket (for uploads)
+  ## -------------------------
+  ReceiptBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub secure-receipts-${AWS::AccountId}
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: aws:kms
+              KMSMasterKeyID: !Ref AppKMSKey
+
+  ## -------------------------
+  ## Lambda: Generate Pre-signed URL
+  ## -------------------------
+  GeneratePresignedUrlFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: lambdas/
+      Handler: generate_presigned_url.lambda_handler
+      Policies:
+        - S3ReadPolicy:
+            BucketName: !Ref ReceiptBucket
+        - S3WritePolicy:
+            BucketName: !Ref ReceiptBucket
+
+  ## -------------------------
+  ## Lambda: Process Receipt (Textract + Store + SES)
+  ## -------------------------
+  ProcessReceiptFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: lambdas/
+      Handler: process_receipt.lambda_handler
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref ReceiptsTable
+        - S3ReadPolicy:
+            BucketName: !Ref ReceiptBucket
+        - Statement:
+            - Effect: Allow
+              Action:
+                - textract:AnalyzeDocument
+                - textract:DetectDocumentText
+              Resource: "*"
+            - Effect: Allow
+              Action: ses:SendEmail
+              Resource: "*"
+            - Effect: Allow
+              Action: kms:Decrypt
+              Resource: !Ref AppKMSKey
+      Events:
+        S3Upload:
+          Type: S3
+          Properties:
+            Bucket: !Ref ReceiptBucket
+            Events: s3:ObjectCreated:*
+
+Outputs:
+  CognitoUserPoolId:
+    Value: !Ref UserPool
+  CognitoUserPoolClientId:
+    Value: !Ref UserPoolClient
+  S3BucketName:
+    Value: !Ref ReceiptBucket
+  DynamoDBTable:
+    Value: !Ref ReceiptsTable
+  KMSKeyId:
+    Value: !Ref AppKMSKey
