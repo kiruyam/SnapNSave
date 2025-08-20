@@ -11,9 +11,7 @@ Globals:
     Runtime: python3.12
 
 Resources:
-  ## -------------------------
   ## Cognito for Authentication
-  ## -------------------------
   UserPool:
     Type: AWS::Cognito::UserPool
     Properties:
@@ -28,9 +26,7 @@ Resources:
       UserPoolId: !Ref UserPool
       GenerateSecret: false
 
-  ## -------------------------
   ## KMS Key for Encryption
-  ## -------------------------
   AppKMSKey:
     Type: AWS::KMS::Key
     Properties:
@@ -43,10 +39,8 @@ Resources:
               AWS: !Sub arn:aws:iam::${AWS::AccountId}:root
             Action: "kms:*"
             Resource: "*"
-
-  ## -------------------------
+            
   ## DynamoDB (KMS Encrypted)
-  ## -------------------------
   ReceiptsTable:
     Type: AWS::DynamoDB::Table
     Properties:
@@ -62,9 +56,7 @@ Resources:
         SSEEnabled: true
         KMSMasterKeyId: !Ref AppKMSKey
 
-  ## -------------------------
   ## S3 Bucket (for uploads)
-  ## -------------------------
   ReceiptBucket:
     Type: AWS::S3::Bucket
     Properties:
@@ -75,9 +67,7 @@ Resources:
               SSEAlgorithm: aws:kms
               KMSMasterKeyID: !Ref AppKMSKey
 
-  ## -------------------------
   ## Lambda: Generate Pre-signed URL
-  ## -------------------------
   GeneratePresignedUrlFunction:
     Type: AWS::Serverless::Function
     Properties:
@@ -89,9 +79,7 @@ Resources:
         - S3WritePolicy:
             BucketName: !Ref ReceiptBucket
 
-  ## -------------------------
   ## Lambda: Process Receipt (Textract + Store + SES)
-  ## -------------------------
   ProcessReceiptFunction:
     Type: AWS::Serverless::Function
     Properties:
